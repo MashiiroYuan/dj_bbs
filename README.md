@@ -28,3 +28,6 @@
 
 ## Django中的站点地图
 
+## 搜索
+1. 通过Search_Vector(name,weight='A')weight设置权重DCBA 对应0.1 0.2 0.4 1 
+2. 三元相似性搜索

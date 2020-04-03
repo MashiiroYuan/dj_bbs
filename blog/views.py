@@ -2,10 +2,12 @@ from django.shortcuts import render, get_object_or_404
 from .models import Post, Comment
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.views.generic import ListView
-from .forms import EmialPostForm, CommentForm
+from .forms import EmialPostForm, CommentForm, SrarchForm
 from django.core.mail import send_mail
 from taggit.models import Tag
 from django.db.models import Count
+from django.contrib.postgres.search import SearchVector,SearchQuery,SearchRank
+from django.contrib.postgres.search import TrigramSimilarity
 
 # email验证
 def post_share(request, post_id):
@@ -71,7 +73,7 @@ def post_list(request, tag_slug=None):
         posts = paginator.page(paginator.num_pages)
     print(posts)
 
-    return render(request, 'blog/post/list.html', {'page': page, 'posts': posts,'tag':tag})
+    return render(request, 'blog/post/list.html', {'page': page, 'posts': posts, 'tag': tag})
 
 
 def post_detail(request, year, month, day, post):
@@ -94,8 +96,27 @@ def post_detail(request, year, month, day, post):
         comment_form = CommentForm()
     # 显示相似Tag文章列表
     post_tag_ids = post.tags.values_list('id', flat=True)
-    similar_tags=Post.published.filter(tags__in=post_tag_ids).exclude(id=post.id)
-    similar_posts=similar_tags.annotate(same_tags=Count('tags')).order_by('-same_tags','-publish')[:4]
+    similar_tags = Post.published.filter(tags__in=post_tag_ids).exclude(id=post.id)
+    similar_posts = similar_tags.annotate(same_tags=Count('tags')).order_by('-same_tags', '-publish')[:4]
     return render(request, 'blog/post/detail.html',
-                  {'post': post, 'comments': comments, 'new_comment': new_comment, 'comment_form': comment_form,'similar_posts':similar_posts})
+                  {'post': post, 'comments': comments, 'new_comment': new_comment, 'comment_form': comment_form,
+                   'similar_posts': similar_posts})
+
+
 # Create your views here.
+
+def post_search(request):
+    form = SrarchForm()
+    query = None
+    results = []
+    if 'query' in request.GET:
+        form = SrarchForm(request.GET)
+        if form.is_valid():
+            query = form.cleaned_data['query']
+            search_vector=SearchVector('title',weight='A')+SearchVector('body',weight='B')
+            search_query=SearchQuery(query)
+            # results = Post.objects.annotate(search=SearchVector('title', 'slug', 'body'),).filter(search=query)
+            # results=Post.objects.annotate(search=search_vector,rank=SearchRank(search_vector,search_query)).filter(rank__gte=0.3).order_by('-rank')
+            results=Post.objects.annotate(similarity=TrigramSimilarity('title',query)).filter(similarity__gte=0.1).order_by('-similarity')
+    return render(request, 'blog/post/search.html', {'query': query, 'form': form, 'results': results})
+

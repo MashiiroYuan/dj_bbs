@@ -28,5 +28,6 @@ urlpatterns = [
     path('<int:post_id>/share/', views.post_share, name='post_share'),
     # path('email/',views.sendemail,name='email')
     path('feed/',LatestPostFeed(),name='post_feed'),
+    path('search/',views.post_search,name='post_search'),
 
 ]
